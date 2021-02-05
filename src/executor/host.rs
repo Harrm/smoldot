@@ -151,13 +151,13 @@
 //!             assert!(finished.value().is_empty());
 //!             println!("Success!");
 //!             break;
-//!         },
+//!         }
 //!
 //!         // Errors can happen if the WebAssembly code panics or does something wrong.
 //!         // In a real-life situation, the host should obviously not panic in these situations.
 //!         HostVm::Error { .. } => {
 //!             panic!("Error while executing code")
-//!         },
+//!         }
 //!
 //!         // All the other variants correspond to function calls that the runtime might perform.
 //!         // `ExternalStorageGet` is shown here as an example.
@@ -179,6 +179,8 @@ use core::{convert::TryFrom as _, fmt, hash::Hasher as _, iter};
 use parity_scale_codec::DecodeAll as _;
 use sha2::Digest as _;
 use tiny_keccak::Hasher as _;
+use futures::StreamExt;
+use std::fmt::Debug;
 
 /// Prototype for an [`HostVm`].
 pub struct HostVmPrototype {
@@ -270,8 +272,12 @@ impl HostVmPrototype {
     pub fn run_vectored(
         self,
         function_to_call: &str,
-        data: impl Iterator<Item = impl AsRef<[u8]>> + Clone,
+        data: impl Iterator<Item=impl AsRef<[u8]>> + Clone,
     ) -> Result<ReadyToRun, StartErr> {
+        println!("Running vectored WASM call: name: {}, args: {}",
+                 function_to_call, data.clone()
+                     .map(|c| format!("{:x?}", c.as_ref()))
+                     .fold("".to_owned(), |i, c| i + c.as_str()));
         let mut data_len_u32: u32 = 0;
         for data in data.clone() {
             let len = u32::try_from(data.as_ref().len()).map_err(|_| StartErr::DataSizeOverflow)?;
@@ -407,8 +413,8 @@ impl ReadyToRun {
                 Ok(vm::ExecOutcome::Interrupted { id, params }) => (id, params),
 
                 Ok(vm::ExecOutcome::Finished {
-                    return_value: Ok(Some(vm::WasmValue::I64(ret))),
-                }) => {
+                       return_value: Ok(Some(vm::WasmValue::I64(ret))),
+                   }) => {
                     // Wasm virtual machine has successfully returned.
 
                     if self.inner.within_storage_transaction {
@@ -452,8 +458,8 @@ impl ReadyToRun {
                 }
 
                 Ok(vm::ExecOutcome::Finished {
-                    return_value: Ok(return_value),
-                }) => {
+                       return_value: Ok(return_value),
+                   }) => {
                     // The Wasm function has successfully returned, but the specs require that it
                     // returns a `i64`.
                     return HostVm::Error {
@@ -465,12 +471,12 @@ impl ReadyToRun {
                 }
 
                 Ok(vm::ExecOutcome::Finished {
-                    return_value: Err(err),
-                }) => {
+                       return_value: Err(err),
+                   }) => {
                     return HostVm::Error {
                         error: Error::Trap(err),
                         prototype: self.inner.into_prototype(),
-                    }
+                    };
                 }
 
                 Err(vm::RunErr::BadValueTy { .. }) => {
@@ -771,7 +777,7 @@ impl ReadyToRun {
                     });
                 }
                 HostFunction::ext_storage_root_version_1 => {
-                    return HostVm::ExternalStorageRoot(ExternalStorageRoot { inner: self.inner })
+                    return HostVm::ExternalStorageRoot(ExternalStorageRoot { inner: self.inner });
                 }
                 HostFunction::ext_storage_changes_root_version_1 => {
                     // TODO: there's a parameter
@@ -864,7 +870,7 @@ impl ReadyToRun {
 
                     // TODO: copy overhead?
                     let success = if let Ok(public_key) =
-                        ed25519_dalek::PublicKey::from_bytes(&pubkey)
+                    ed25519_dalek::PublicKey::from_bytes(&pubkey)
                     {
                         // TODO: copy overhead?
                         let signature =
@@ -941,13 +947,13 @@ impl ReadyToRun {
                         } else {
                             sig[64]
                         } as u8)
-                        .map_err(|_| EcdsaVerifyError::VError)?;
+                            .map_err(|_| EcdsaVerifyError::VError)?;
                         let pubkey = secp256k1::recover(
                             &secp256k1::Message::parse_slice(&msg).unwrap(),
                             &rs,
                             &v,
                         )
-                        .map_err(|_| EcdsaVerifyError::BadSignature)?;
+                            .map_err(|_| EcdsaVerifyError::BadSignature)?;
                         let mut res = [0u8; 64];
                         res.copy_from_slice(&pubkey.serialize()[1..65]);
                         Ok(res)
@@ -982,13 +988,13 @@ impl ReadyToRun {
                         } else {
                             sig[64]
                         } as u8)
-                        .map_err(|_| EcdsaVerifyError::VError)?;
+                            .map_err(|_| EcdsaVerifyError::VError)?;
                         let pubkey = secp256k1::recover(
                             &secp256k1::Message::parse_slice(&msg).unwrap(),
                             &rs,
                             &v,
                         )
-                        .map_err(|_| EcdsaVerifyError::BadSignature)?;
+                            .map_err(|_| EcdsaVerifyError::BadSignature)?;
                         Ok(pubkey.serialize_compressed())
                     })();
                     let result_encoded = parity_scale_codec::Encode::encode(&result);
@@ -1178,7 +1184,7 @@ impl ReadyToRun {
                             return HostVm::Error {
                                 error: Error::ParamDecodeError(err),
                                 prototype: self.inner.into_prototype(),
-                            }
+                            };
                         }
                     };
 
@@ -1206,7 +1212,7 @@ impl ReadyToRun {
                             return HostVm::Error {
                                 error: Error::ParamDecodeError(err),
                                 prototype: self.inner.into_prototype(),
-                            }
+                            };
                         }
                     };
 
@@ -1245,7 +1251,7 @@ impl ReadyToRun {
                                     actual: v.ty(),
                                 },
                                 prototype: self.inner.into_prototype(),
-                            }
+                            };
                         }
                     };
 
@@ -1307,7 +1313,7 @@ impl ReadyToRun {
                                     requested_size: size,
                                 },
                                 prototype: self.inner.into_prototype(),
-                            }
+                            };
                         }
                     };
 
@@ -1329,7 +1335,7 @@ impl ReadyToRun {
                             return HostVm::Error {
                                 error: Error::FreeError { pointer },
                                 prototype: self.inner.into_prototype(),
-                            }
+                            };
                         }
                     };
 
@@ -1491,7 +1497,7 @@ impl ExternalStorageGet {
     ///
     pub fn resume_vectored(
         mut self,
-        value: Option<impl Iterator<Item = impl AsRef<[u8]>> + Clone>,
+        value: Option<impl Iterator<Item=impl AsRef<[u8]>> + Clone>,
     ) -> HostVm {
         let host_fn = self.inner.registered_functions[self.calling];
         match host_fn {
@@ -1978,7 +1984,7 @@ impl Inner {
     fn alloc_write_and_return_pointer_size(
         mut self,
         function_name: &'static str,
-        data: impl Iterator<Item = impl AsRef<[u8]>> + Clone,
+        data: impl Iterator<Item=impl AsRef<[u8]>> + Clone,
     ) -> HostVm {
         let mut data_len = 0u32;
         for chunk in data.clone() {
@@ -1998,7 +2004,7 @@ impl Inner {
                         requested_size: data_len,
                     },
                     prototype: self.into_prototype(),
-                }
+                };
             }
         };
 
@@ -2016,7 +2022,7 @@ impl Inner {
             inner: self,
             resume_value: Some(vm::WasmValue::I64(ret_val)),
         }
-        .into()
+            .into()
     }
 
     /// Uses the memory allocator to allocate some memory for the given data, writes the data in
@@ -2033,7 +2039,7 @@ impl Inner {
     fn alloc_write_and_return_pointer(
         mut self,
         function_name: &'static str,
-        data: impl Iterator<Item = impl AsRef<[u8]>> + Clone,
+        data: impl Iterator<Item=impl AsRef<[u8]>> + Clone,
     ) -> HostVm {
         let mut data_len = 0u32;
         for chunk in data.clone() {
@@ -2053,7 +2059,7 @@ impl Inner {
                         requested_size: data_len,
                     },
                     prototype: self.into_prototype(),
-                }
+                };
             }
         };
 
@@ -2069,7 +2075,7 @@ impl Inner {
             inner: self,
             resume_value: Some(vm::WasmValue::I32(ret_val)),
         }
-        .into()
+            .into()
     }
 
     /// Turns the virtual machine back into a prototype.
@@ -2130,10 +2136,10 @@ pub enum Error {
     ReturnValueTypeMismatch,
     /// Mismatch between the number of parameters expected and the actual number.
     #[display(
-        fmt = "Mismatch in parameters count: {}, expected = {}, actual = {}",
-        function,
-        expected,
-        actual
+    fmt = "Mismatch in parameters count: {}, expected = {}, actual = {}",
+    function,
+    expected,
+    actual
     )]
     ParamsCountMismatch {
         /// Name of the function being called whose number of parameters mismatches.
@@ -2148,11 +2154,11 @@ pub enum Error {
     ParamDecodeError(parity_scale_codec::Error),
     /// The type of one of the parameters is wrong.
     #[display(
-        fmt = "Type mismatch in parameter #{}: {}, expected = {:?}, actual = {:?}",
-        param_num,
-        function,
-        expected,
-        actual
+    fmt = "Type mismatch in parameter #{}: {}, expected = {:?}, actual = {:?}",
+    param_num,
+    function,
+    expected,
+    actual
     )]
     WrongParamTy {
         /// Name of the function being called where a type mismatch happens.
@@ -2167,11 +2173,11 @@ pub enum Error {
     /// One parameter is expected to point to a buffer, but the pointer is out
     /// of range of the memory of the Wasm VM.
     #[display(
-        fmt = "Bad pointer for parameter #{} of {}: 0x{:x}, len = 0x{:x}",
-        param_num,
-        function,
-        pointer,
-        length
+    fmt = "Bad pointer for parameter #{} of {}: 0x{:x}, len = 0x{:x}",
+    param_num,
+    function,
+    pointer,
+    length
     )]
     ParamOutOfRange {
         /// Name of the function being called where a type mismatch happens.
@@ -2189,10 +2195,10 @@ pub enum Error {
     /// One parameter is expected to point to a UTF-8 string, but the buffer
     /// isn't valid UTF-8.
     #[display(
-        fmt = "UTF-8 error for parameter #{} of {}: {}",
-        param_num,
-        function,
-        error
+    fmt = "UTF-8 error for parameter #{} of {}: {}",
+    param_num,
+    function,
+    error
     )]
     Utf8Error {
         /// Name of the function being called where a type mismatch happens.
@@ -2216,9 +2222,9 @@ pub enum Error {
     FinishedWithPendingTransaction,
     /// Error when allocating memory for a return type.
     #[display(
-        fmt = "Out of memory allocating 0x{:x} bytes during {}",
-        requested_size,
-        function
+    fmt = "Out of memory allocating 0x{:x} bytes during {}",
+    requested_size,
+    function
     )]
     OutOfMemory {
         /// Name of the function being called.
@@ -2228,8 +2234,8 @@ pub enum Error {
     },
     /// Called `ext_allocator_free_version_1` with an invalid pointer.
     #[display(
-        fmt = "Bad pointer passed to ext_allocator_free_version_1: 0x{:x}",
-        pointer
+    fmt = "Bad pointer passed to ext_allocator_free_version_1: 0x{:x}",
+    pointer
     )]
     FreeError {
         /// Pointer that was expected to be free'd.
@@ -2360,6 +2366,7 @@ externalities! {
 
 // Glue between the `allocator` module and the `vm` module.
 struct MemAccess<'a>(&'a mut vm::VirtualMachine);
+
 impl<'a> allocator::Memory for MemAccess<'a> {
     fn read_le_u64(&self, ptr: u32) -> Result<u64, allocator::Error> {
         let bytes = self.0.read_memory(ptr, 8).unwrap(); // TODO: convert error

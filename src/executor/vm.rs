@@ -165,6 +165,16 @@ impl VirtualMachinePrototype {
         function_name: &str,
         params: &[WasmValue],
     ) -> Result<VirtualMachine, StartErr> {
+        println!("Starting WASM call: name: {}, args: {}",
+                 function_name, params.clone().into_iter()
+                     .map(|c| format!("{:x?}", {
+                         match c {
+                             WasmValue::I32(i) => *i as i64,
+                             WasmValue::I64(i) => *i
+                         }
+                     }))
+                     .fold("".to_owned(), |i, c| i + c.as_str() + ", "));
+
         Ok(VirtualMachine {
             inner: match self.inner {
                 #[cfg(all(target_arch = "x86_64", feature = "std"))]

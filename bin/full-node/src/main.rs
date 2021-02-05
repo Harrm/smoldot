@@ -55,7 +55,7 @@ async fn async_main() {
             .with_max_level(if matches!(cli_options.output, cli::Output::Informant) {
                 tracing::Level::WARN // TODO: display warnings in a nicer way ; in particular, immediately put the informant on top of warnings
             } else {
-                tracing::Level::TRACE // TODO: configurable?
+                tracing::Level::DEBUG // TODO: configurable?
             })
             .with_writer(io::stdout);
 

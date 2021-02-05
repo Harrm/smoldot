@@ -320,6 +320,7 @@ impl FreeingBumpHeapAllocator {
     /// - `mem` - a slice representing the linear memory on which this allocator operates.
     /// - `size` - size in bytes of the allocation request
     pub fn allocate<M: Memory + ?Sized>(&mut self, mem: &mut M, size: u32) -> Result<u32, Error> {
+        println!("Attempt to allocate {} bytes", size);
         let order = Order::from_size(size)?;
 
         let header_ptr: u32 = match self.free_lists[order] {
@@ -348,6 +349,7 @@ impl FreeingBumpHeapAllocator {
         Header::Occupied(order).write_into(mem, header_ptr)?;
 
         self.total_size += order.size() + HEADER_SIZE;
+        println!("Total size is {} now", self.total_size);
         Ok(header_ptr + HEADER_SIZE)
     }
 
@@ -358,6 +360,7 @@ impl FreeingBumpHeapAllocator {
     /// - `mem` - a slice representing the linear memory on which this allocator operates.
     /// - `ptr` - pointer to the allocated chunk
     pub fn deallocate<M: Memory + ?Sized>(&mut self, mem: &mut M, ptr: u32) -> Result<(), Error> {
+        println!("Attempt to deallocate chunk with address {}", ptr);
         let header_ptr = ptr
             .checked_sub(HEADER_SIZE)
             .ok_or(Error::Other("Invalid pointer for deallocation"))?;
@@ -377,6 +380,7 @@ impl FreeingBumpHeapAllocator {
             .ok_or(Error::Other(
                 "Unable to subtract from total heap size without overflow",
             ))?;
+        println!("Total size is {} now", self.total_size);
 
         Ok(())
     }
@@ -390,9 +394,9 @@ impl FreeingBumpHeapAllocator {
         if self.bumper + size > heap_end {
             return Err(Error::AllocatorOutOfSpace);
         }
-
         let res = self.bumper;
         self.bumper += size;
+        println!("Bumping by {}, bumper is {} now (was {})", size, self.bumper, res);
         Ok(res)
     }
 }
