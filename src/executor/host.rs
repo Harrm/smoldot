@@ -739,6 +739,7 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_storage_get_version_1 => {
                     let key = expect_pointer_size!(0);
+                    println!("ext_storage_get_version_1 key: {:x?}", key);
                     return HostVm::ExternalStorageGet(ExternalStorageGet {
                         key,
                         calling: id,
@@ -752,6 +753,7 @@ impl ReadyToRun {
                     let key = expect_pointer_size!(0);
                     let (value_out_ptr, value_out_size) = expect_pointer_size_raw!(1);
                     let offset = expect_u32!(2);
+                    println!("ext_storage_read_version_1 key: {:x?}; offset: {}", key, offset);
                     return HostVm::ExternalStorageGet(ExternalStorageGet {
                         key,
                         calling: id,
@@ -771,6 +773,7 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_storage_exists_version_1 => {
                     let key = expect_pointer_size!(0);
+                    println!("ext_storage_exists_version_1 key: {:x?}", key);
                     return HostVm::ExternalStorageGet(ExternalStorageGet {
                         key,
                         calling: id,
@@ -1051,6 +1054,7 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_sha2_256_version_1 => {
                     let data = expect_pointer_size!(0);
+                    println!("[SMOLDOT host] ext_hashing_sha2_256_version_1 input data {:x?}", data);
 
                     let mut hasher = sha2::Sha256::new();
                     hasher.update(data);
@@ -1067,6 +1071,7 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_blake2_128_version_1 => {
                     let data = expect_pointer_size!(0);
+                    println!("[SMOLDOT host] ext_hashing_blake2_128_version_1 input data {:x?}", data);
                     let out = blake2_rfc::blake2b::blake2b(16, &[], &data);
 
                     println!("[SMOLDOT host] ext_hashing_blake2_128_version_1 -> {:x?}", out.as_bytes());
@@ -1080,6 +1085,7 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_blake2_256_version_1 => {
                     let data = expect_pointer_size!(0);
+                    println!("[SMOLDOT host] ext_hashing_blake2_256_version_1 input data {:x?}", data);
                     let out = blake2_rfc::blake2b::blake2b(32, &[], &data);
 
                     println!("[SMOLDOT host] ext_hashing_blake2_256_version_1 -> {:x?}", out.as_bytes());
@@ -1093,6 +1099,7 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_twox_64_version_1 => {
                     let data = expect_pointer_size!(0);
+                    println!("[SMOLDOT host] ext_hashing_twox_64_version_1 input data {:x?}", data);
 
                     let mut h0 = twox_hash::XxHash::with_seed(0);
                     h0.write(&data);
@@ -1110,6 +1117,7 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_twox_128_version_1 => {
                     let data = expect_pointer_size!(0);
+                    println!("[SMOLDOT host] ext_hashing_twox_128_version_1 input data {:x?}", data);
 
                     let mut h0 = twox_hash::XxHash::with_seed(0);
                     let mut h1 = twox_hash::XxHash::with_seed(1);
@@ -1131,6 +1139,7 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_twox_256_version_1 => {
                     let data = expect_pointer_size!(0);
+                    println!("[SMOLDOT host] ext_hashing_twox_256_version_1 input data {:x?}", data);
 
                     let mut h0 = twox_hash::XxHash::with_seed(0);
                     let mut h1 = twox_hash::XxHash::with_seed(1);
