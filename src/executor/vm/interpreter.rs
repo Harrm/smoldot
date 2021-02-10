@@ -207,6 +207,8 @@ impl InterpreterPrototype {
             None
         };
 
+        println!("Module externals: {:?}", module.exports.borrow().iter().map(|(k, v)| k.clone()).collect::<Vec<_>>());
+
         Ok(InterpreterPrototype {
             module,
             memory,
@@ -235,6 +237,7 @@ impl InterpreterPrototype {
 
     /// See [`super::VirtualMachinePrototype::start`].
     pub fn start(self, function_name: &str, params: &[WasmValue]) -> Result<Interpreter, StartErr> {
+        println!("[SMOLDOT interpreter] fn {} params: {:?}", function_name, params);
         let execution = match self.module.export_by_name(function_name) {
             Some(wasmi::ExternVal::Func(f)) => {
                 // Try to convert the signature of the function to call, in order to make sure
@@ -339,6 +342,10 @@ impl Interpreter {
                     args: args.as_ref().to_vec(),
                 }))
                 .into())
+            }
+
+            fn name_by_index(&self, _: usize) -> Option<String> {
+                None
             }
         }
 

@@ -83,7 +83,6 @@ mod grandpa;
 pub use aura::*;
 pub use babe::*;
 pub use grandpa::*;
-use std::fmt::Debug;
 
 /// Returns a hash of a SCALE-encoded header.
 ///

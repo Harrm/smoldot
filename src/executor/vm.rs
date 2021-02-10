@@ -122,13 +122,15 @@ impl VirtualMachinePrototype {
         exec_hint: ExecHint,
         symbols: impl FnMut(&str, &str, &Signature) -> Result<usize, ()>,
     ) -> Result<Self, NewErr> {
-        let use_wasmtime = match exec_hint {
+        let use_wasmtime = false;
+        /* Disable JIT because interpreter is more convenient for log printing
+        match exec_hint {
             #[cfg(all(target_arch = "x86_64", feature = "std"))]
             ExecHint::CompileAheadOfTime => true,
             #[cfg(not(all(target_arch = "x86_64", feature = "std")))]
             ExecHint::CompileAheadOfTime => false,
             ExecHint::Oneshot | ExecHint::Untrusted => false,
-        };
+        };*/
 
         Ok(VirtualMachinePrototype {
             inner: if use_wasmtime {

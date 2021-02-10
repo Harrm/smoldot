@@ -33,7 +33,7 @@
 //! >           could theoretically be handled directly by this module, it might be useful for
 //! >           testing purposes to have the possibility to return a deterministic value.
 //!
-//! Contrary to most programs, runtime code doesn't have a singe `main` or `start` function.
+//! Contrary to most programs, runtime code doesn't have a single `main` or `start` function.
 //! Instead, it exposes several entry points. Which one to call indicates which action it has to
 //! perform. Not all entry points are necessarily available on all runtimes.
 //!
@@ -274,10 +274,17 @@ impl HostVmPrototype {
         function_to_call: &str,
         data: impl Iterator<Item=impl AsRef<[u8]>> + Clone,
     ) -> Result<ReadyToRun, StartErr> {
-        println!("Running vectored WASM call: name: {}, args: {}",
+        println!("Running WASM call: name: {}, args: {}",
                  function_to_call, data.clone()
-                     .map(|c| format!("{:x?}", c.as_ref()))
+                     .map(|c| {
+                         let mut s = String::new();
+                         for char in c.as_ref() {
+                             s.push_str(&format!("{:x?}", char));
+                         }
+                         s
+                     })
                      .fold("".to_owned(), |i, c| i + c.as_str()));
+
         let mut data_len_u32: u32 = 0;
         for data in data.clone() {
             let len = u32::try_from(data.as_ref().len()).map_err(|_| StartErr::DataSizeOverflow)?;
@@ -439,6 +446,7 @@ impl ReadyToRun {
                         .read_memory(ret_ptr, ret_len)
                         .map(|d| d.as_ref().to_vec());
                     if let Ok(value) = ret_data {
+                        println!("[SMOLDOT host] Return {:x?} from WASM", value);
                         return HostVm::Finished(Finished {
                             inner: self.inner,
                             value,
@@ -498,6 +506,8 @@ impl ReadyToRun {
             // The Wasm code has called an host_fn. The `id` is a value that we passed
             // at initialization, and corresponds to an index in `registered_functions`.
             let host_fn = *self.inner.registered_functions.get_mut(id).unwrap();
+
+            println!("[SMOLDOT Host] host fn {}; args: {:?}", host_fn.name(), params);
 
             // Check that the actual number of parameters matches the expected number.
             // This is done ahead of time in order to not forget.
@@ -1030,7 +1040,7 @@ impl ReadyToRun {
                     keccak.update(&data);
                     let mut out = [0u8; 32];
                     keccak.finalize(&mut out);
-
+                    println!("[SMOLDOT host] ext_hashing_keccak_256_version_1 -> {:x?}", out);
                     match self
                         .inner
                         .alloc_write_and_return_pointer(host_fn.name(), iter::once(&out))
@@ -1045,9 +1055,11 @@ impl ReadyToRun {
                     let mut hasher = sha2::Sha256::new();
                     hasher.update(data);
 
+                    let hash = hasher.finalize();
+                    println!("[SMOLDOT host] ext_hashing_sha2_256_version_1 -> {:x?}", hash);
                     match self.inner.alloc_write_and_return_pointer(
                         host_fn.name(),
-                        iter::once(hasher.finalize().as_slice()),
+                        iter::once(hash.as_slice()),
                     ) {
                         HostVm::ReadyToRun(r) => self = r,
                         other => return other,
@@ -1057,6 +1069,7 @@ impl ReadyToRun {
                     let data = expect_pointer_size!(0);
                     let out = blake2_rfc::blake2b::blake2b(16, &[], &data);
 
+                    println!("[SMOLDOT host] ext_hashing_blake2_128_version_1 -> {:x?}", out.as_bytes());
                     match self
                         .inner
                         .alloc_write_and_return_pointer(host_fn.name(), iter::once(out.as_bytes()))
@@ -1069,6 +1082,7 @@ impl ReadyToRun {
                     let data = expect_pointer_size!(0);
                     let out = blake2_rfc::blake2b::blake2b(32, &[], &data);
 
+                    println!("[SMOLDOT host] ext_hashing_blake2_256_version_1 -> {:x?}", out.as_bytes());
                     match self
                         .inner
                         .alloc_write_and_return_pointer(host_fn.name(), iter::once(out.as_bytes()))
@@ -1083,6 +1097,8 @@ impl ReadyToRun {
                     let mut h0 = twox_hash::XxHash::with_seed(0);
                     h0.write(&data);
                     let r0 = h0.finish();
+
+                    println!("[SMOLDOT host] ext_hashing_twox_64_version_1 -> {:x?}", r0.to_le_bytes());
 
                     match self.inner.alloc_write_and_return_pointer(
                         host_fn.name(),
@@ -1102,6 +1118,9 @@ impl ReadyToRun {
                     let r0 = h0.finish();
                     let r1 = h1.finish();
 
+                    let data = iter::once(&r0.to_le_bytes())
+                        .chain(iter::once(&r1.to_le_bytes())).flatten().map(|i| *i).collect::<Vec<u8>>();
+                    println!("[SMOLDOT host] ext_hashing_twox_128_version_1 -> {:x?}", data);
                     match self.inner.alloc_write_and_return_pointer(
                         host_fn.name(),
                         iter::once(&r0.to_le_bytes()).chain(iter::once(&r1.to_le_bytes())),
@@ -1125,6 +1144,13 @@ impl ReadyToRun {
                     let r1 = h1.finish();
                     let r2 = h2.finish();
                     let r3 = h3.finish();
+
+                    let data = iter::once(&r0.to_le_bytes())
+                        .chain(iter::once(&r1.to_le_bytes()))
+                        .chain(iter::once(&r2.to_le_bytes()))
+                        .chain(iter::once(&r3.to_le_bytes()))
+                        .flatten().map(|i| *i).collect::<Vec<u8>>();
+                    println!("[SMOLDOT host] ext_hashing_twox_256_version_1 -> {:x?}", data);
 
                     match self.inner.alloc_write_and_return_pointer(
                         host_fn.name(),
@@ -1307,7 +1333,10 @@ impl ReadyToRun {
                         .allocator
                         .allocate(&mut MemAccess(&mut self.inner.vm), size)
                     {
-                        Ok(p) => p,
+                        Ok(p) => {
+                            println!("[SMOLDOT host] ext_allocator_malloc_version_1 -> {}", p);
+                            p
+                        },
                         Err(_) => {
                             return HostVm::Error {
                                 error: Error::OutOfMemory {
@@ -1508,6 +1537,8 @@ impl ExternalStorageGet {
                     // Writing `Some(value)`.
                     let value_len = value.clone().fold(0, |a, b| a + b.as_ref().len());
                     let value_len_enc = util::encode_scale_compact_usize(value_len);
+                    let value_copy: Vec<u8> = value.clone().map(|i| i.as_ref().to_owned()).flatten().collect();
+                    println!("[SMOLDOT host] ext_storage_get_version_1 -> {:x?}", value_copy);
                     self.inner.alloc_write_and_return_pointer_size(
                         host_fn.name(),
                         iter::once(&[1][..])
@@ -1517,6 +1548,7 @@ impl ExternalStorageGet {
                     )
                 } else {
                     // Write a SCALE-encoded `None`.
+                    println!("[SMOLDOT host] ext_storage_get_version_1 -> None");
                     self.inner
                         .alloc_write_and_return_pointer_size(host_fn.name(), iter::once(&[0]))
                 }
@@ -1533,11 +1565,13 @@ impl ExternalStorageGet {
                         self.inner.vm.write_memory(offset, value).unwrap();
                         offset += u32::try_from(value.len()).unwrap();
                     }
+                    println!("[SMOLDOT host] ext_storage_read_version_1 -> {}", written);
                     // TODO: while the specs mention that `written` should be returned,
                     // substrate instead returns the total length of the read value;
                     // see https://github.com/paritytech/substrate/pull/7084
                     Some(written)
                 } else {
+                    println!("[SMOLDOT host] ext_storage_read_version_1 -> None");
                     None
                 };
 
@@ -1550,8 +1584,10 @@ impl ExternalStorageGet {
             HostFunction::ext_storage_exists_version_1 => HostVm::ReadyToRun(ReadyToRun {
                 inner: self.inner,
                 resume_value: Some(if value.is_some() {
+                    println!("[SMOLDOT host] ext_storage_exists_version_1 -> 1");
                     vm::WasmValue::I32(1)
                 } else {
+                    println!("[SMOLDOT host] ext_storage_exists_version_1 -> 0");
                     vm::WasmValue::I32(0)
                 }),
             }),

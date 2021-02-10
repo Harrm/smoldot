@@ -45,7 +45,6 @@ use crate::{
 use alloc::{string::String, vec::Vec};
 use core::{fmt, iter, slice};
 use hashbrown::{HashMap, HashSet};
-use std::fmt::Debug;
 
 /// Configuration for [`run`].
 pub struct Config<'a, TParams> {

@@ -23,7 +23,6 @@ use crate::executor::{self, host, vm};
 
 use alloc::{string::String, vec::Vec};
 use core::{fmt, iter};
-use std::fmt::Debug;
 
 /// Configuration for [`run`].
 pub struct Config<'a, TParams> {
