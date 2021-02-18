@@ -73,7 +73,7 @@ pub struct Config<'a, TParams> {
 
 /// Start running the WebAssembly virtual machine.
 pub fn run(
-    config: Config<impl Iterator<Item = impl AsRef<[u8]>> + Clone>,
+    config: Config<impl Iterator<Item=impl AsRef<[u8]>> + Clone>,
 ) -> Result<RuntimeHostVm, host::StartErr> {
     Ok(Inner {
         vm: config
@@ -88,7 +88,7 @@ pub fn run(
         root_calculation: None,
         logs: String::new(),
     }
-    .run())
+        .run())
 }
 
 /// Execution is successful.
@@ -164,7 +164,7 @@ pub struct StorageGet {
 
 impl StorageGet {
     /// Returns the key whose value must be passed to [`StorageGet::inject_value`].
-    pub fn key<'a>(&'a self) -> impl Iterator<Item = impl AsRef<[u8]> + 'a> + 'a {
+    pub fn key<'a>(&'a self) -> impl Iterator<Item=impl AsRef<[u8]> + 'a> + 'a {
         match &self.inner.vm {
             host::HostVm::ExternalStorageGet(req) => {
                 either::Either::Left(iter::once(either::Either::Left(req.key())))
@@ -175,7 +175,7 @@ impl StorageGet {
 
             host::HostVm::ExternalStorageRoot(_) => {
                 if let calculate_root::RootMerkleValueCalculation::StorageValue(value_request) =
-                    self.inner.root_calculation.as_ref().unwrap()
+                self.inner.root_calculation.as_ref().unwrap()
                 {
                     struct One(u8);
                     impl AsRef<[u8]> for One {
@@ -212,7 +212,7 @@ impl StorageGet {
     /// Injects the corresponding storage value.
     pub fn inject_value(
         mut self,
-        value: Option<impl Iterator<Item = impl AsRef<[u8]>>>,
+        value: Option<impl Iterator<Item=impl AsRef<[u8]>>>,
     ) -> RuntimeHostVm {
         // TODO: update the implementation to not require the folding here
         let value = value.map(|i| {
@@ -238,7 +238,7 @@ impl StorageGet {
             }
             host::HostVm::ExternalStorageRoot(_) => {
                 if let calculate_root::RootMerkleValueCalculation::StorageValue(value_request) =
-                    self.inner.root_calculation.take().unwrap()
+                self.inner.root_calculation.take().unwrap()
                 {
                     self.inner.root_calculation = Some(value_request.inject(value));
                 } else {
@@ -282,7 +282,7 @@ impl PrefixKeys {
     }
 
     /// Injects the list of keys.
-    pub fn inject_keys(mut self, keys: impl Iterator<Item = impl AsRef<[u8]>>) -> RuntimeHostVm {
+    pub fn inject_keys(mut self, keys: impl Iterator<Item=impl AsRef<[u8]>>) -> RuntimeHostVm {
         match self.inner.vm {
             host::HostVm::ExternalStorageClearPrefix(req) => {
                 // TODO: use prefix_remove_update once optimized
@@ -318,7 +318,7 @@ impl PrefixKeys {
 
             host::HostVm::ExternalStorageRoot { .. } => {
                 if let calculate_root::RootMerkleValueCalculation::AllKeys(all_keys) =
-                    self.inner.root_calculation.take().unwrap()
+                self.inner.root_calculation.take().unwrap()
                 {
                     // TODO: overhead
                     let mut list = keys
@@ -508,8 +508,11 @@ impl Inner {
                 }
 
                 host::HostVm::ExternalStorageSet(req) => {
-                    println!("[SMOLDOT runtime_host] ExternalStorageSet: key: {:x?}, value: {:x?}",
-                    req.key(), req.value());
+                    let key_hex = req.key().iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    let value_hex = req.value().map(|v| v.iter().map(|e| format!("{:02x}", e)).collect::<String>());
+                    println!("[SMOLDOT runtime_host] ExternalStorageSet: key: {}, value: {:?}",
+                             key_hex, value_hex);
+
                     self.top_trie_root_calculation_cache
                         .as_mut()
                         .unwrap()

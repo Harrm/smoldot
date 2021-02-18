@@ -279,7 +279,7 @@ impl HostVmPrototype {
                      .map(|c| {
                          let mut s = String::new();
                          for char in c.as_ref() {
-                             s.push_str(&format!("{:x?}", char));
+                             s.push_str(&format!("{:02x?}", char));
                          }
                          s
                      })
@@ -446,7 +446,8 @@ impl ReadyToRun {
                         .read_memory(ret_ptr, ret_len)
                         .map(|d| d.as_ref().to_vec());
                     if let Ok(value) = ret_data {
-                        println!("[SMOLDOT host] Return {:x?} from WASM", value);
+                        let value_hex = value.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                        println!("[SMOLDOT host] Return {} from WASM", value_hex);
                         return HostVm::Finished(Finished {
                             inner: self.inner,
                             value,
@@ -739,7 +740,8 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_storage_get_version_1 => {
                     let key = expect_pointer_size!(0);
-                    println!("ext_storage_get_version_1 key: {:x?}", key);
+                    let key_hex = key.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("ext_storage_get_version_1 key: {}", key_hex);
                     return HostVm::ExternalStorageGet(ExternalStorageGet {
                         key,
                         calling: id,
@@ -753,7 +755,8 @@ impl ReadyToRun {
                     let key = expect_pointer_size!(0);
                     let (value_out_ptr, value_out_size) = expect_pointer_size_raw!(1);
                     let offset = expect_u32!(2);
-                    println!("ext_storage_read_version_1 key: {:x?}; offset: {}", key, offset);
+                    let key_hex = key.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("ext_storage_read_version_1 key: {}; offset: {}", key_hex, offset);
                     return HostVm::ExternalStorageGet(ExternalStorageGet {
                         key,
                         calling: id,
@@ -773,7 +776,8 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_storage_exists_version_1 => {
                     let key = expect_pointer_size!(0);
-                    println!("ext_storage_exists_version_1 key: {:x?}", key);
+                    let key_hex = key.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("ext_storage_exists_version_1 key: {}", key_hex);
                     return HostVm::ExternalStorageGet(ExternalStorageGet {
                         key,
                         calling: id,
@@ -1043,7 +1047,8 @@ impl ReadyToRun {
                     keccak.update(&data);
                     let mut out = [0u8; 32];
                     keccak.finalize(&mut out);
-                    println!("[SMOLDOT host] ext_hashing_keccak_256_version_1 -> {:x?}", out);
+                    let out_hex = out.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_keccak_256_version_1 -> {}", out_hex);
                     match self
                         .inner
                         .alloc_write_and_return_pointer(host_fn.name(), iter::once(&out))
@@ -1054,13 +1059,15 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_sha2_256_version_1 => {
                     let data = expect_pointer_size!(0);
-                    println!("[SMOLDOT host] ext_hashing_sha2_256_version_1 input data {:x?}", data);
+                    let data_hex = data.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_sha2_256_version_1 input data {}", data_hex);
 
                     let mut hasher = sha2::Sha256::new();
                     hasher.update(data);
 
                     let hash = hasher.finalize();
-                    println!("[SMOLDOT host] ext_hashing_sha2_256_version_1 -> {:x?}", hash);
+                    let hash_hex = hash.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_sha2_256_version_1 -> {}", hash_hex);
                     match self.inner.alloc_write_and_return_pointer(
                         host_fn.name(),
                         iter::once(hash.as_slice()),
@@ -1071,10 +1078,12 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_blake2_128_version_1 => {
                     let data = expect_pointer_size!(0);
-                    println!("[SMOLDOT host] ext_hashing_blake2_128_version_1 input data {:x?}", data);
+                    let data_hex = data.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_blake2_128_version_1 input data {}", data_hex);
                     let out = blake2_rfc::blake2b::blake2b(16, &[], &data);
 
-                    println!("[SMOLDOT host] ext_hashing_blake2_128_version_1 -> {:x?}", out.as_bytes());
+                    let out_hex = out.as_bytes().iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_blake2_128_version_1 -> {}", out_hex);
                     match self
                         .inner
                         .alloc_write_and_return_pointer(host_fn.name(), iter::once(out.as_bytes()))
@@ -1085,10 +1094,12 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_blake2_256_version_1 => {
                     let data = expect_pointer_size!(0);
-                    println!("[SMOLDOT host] ext_hashing_blake2_256_version_1 input data {:x?}", data);
+                    let data_hex = data.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_blake2_256_version_1 input data {}", data_hex);
                     let out = blake2_rfc::blake2b::blake2b(32, &[], &data);
 
-                    println!("[SMOLDOT host] ext_hashing_blake2_256_version_1 -> {:x?}", out.as_bytes());
+                    let out_hex = out.as_bytes().iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_blake2_256_version_1 -> {}", out_hex);
                     match self
                         .inner
                         .alloc_write_and_return_pointer(host_fn.name(), iter::once(out.as_bytes()))
@@ -1099,13 +1110,15 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_twox_64_version_1 => {
                     let data = expect_pointer_size!(0);
-                    println!("[SMOLDOT host] ext_hashing_twox_64_version_1 input data {:x?}", data);
+                    let data_hex = data.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_twox_64_version_1 input data {}", data_hex);
 
                     let mut h0 = twox_hash::XxHash::with_seed(0);
                     h0.write(&data);
                     let r0 = h0.finish();
 
-                    println!("[SMOLDOT host] ext_hashing_twox_64_version_1 -> {:x?}", r0.to_le_bytes());
+                    let out_hex = r0.to_le_bytes().iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_twox_64_version_1 -> {}", out_hex);
 
                     match self.inner.alloc_write_and_return_pointer(
                         host_fn.name(),
@@ -1117,7 +1130,8 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_twox_128_version_1 => {
                     let data = expect_pointer_size!(0);
-                    println!("[SMOLDOT host] ext_hashing_twox_128_version_1 input data {:x?}", data);
+                    let data_hex = data.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_twox_128_version_1 input data {}", data_hex);
 
                     let mut h0 = twox_hash::XxHash::with_seed(0);
                     let mut h1 = twox_hash::XxHash::with_seed(1);
@@ -1128,7 +1142,8 @@ impl ReadyToRun {
 
                     let data = iter::once(&r0.to_le_bytes())
                         .chain(iter::once(&r1.to_le_bytes())).flatten().map(|i| *i).collect::<Vec<u8>>();
-                    println!("[SMOLDOT host] ext_hashing_twox_128_version_1 -> {:x?}", data);
+                    let data_hex = data.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_twox_128_version_1 -> {}", data_hex);
                     match self.inner.alloc_write_and_return_pointer(
                         host_fn.name(),
                         iter::once(&r0.to_le_bytes()).chain(iter::once(&r1.to_le_bytes())),
@@ -1139,7 +1154,8 @@ impl ReadyToRun {
                 }
                 HostFunction::ext_hashing_twox_256_version_1 => {
                     let data = expect_pointer_size!(0);
-                    println!("[SMOLDOT host] ext_hashing_twox_256_version_1 input data {:x?}", data);
+                    let data_hex = data.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_twox_256_version_1 input data {}", data_hex);
 
                     let mut h0 = twox_hash::XxHash::with_seed(0);
                     let mut h1 = twox_hash::XxHash::with_seed(1);
@@ -1159,7 +1175,8 @@ impl ReadyToRun {
                         .chain(iter::once(&r2.to_le_bytes()))
                         .chain(iter::once(&r3.to_le_bytes()))
                         .flatten().map(|i| *i).collect::<Vec<u8>>();
-                    println!("[SMOLDOT host] ext_hashing_twox_256_version_1 -> {:x?}", data);
+                    let data_hex = data.iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                    println!("[SMOLDOT host] ext_hashing_twox_256_version_1 -> {}", data_hex);
 
                     match self.inner.alloc_write_and_return_pointer(
                         host_fn.name(),
@@ -1547,7 +1564,8 @@ impl ExternalStorageGet {
                     let value_len = value.clone().fold(0, |a, b| a + b.as_ref().len());
                     let value_len_enc = util::encode_scale_compact_usize(value_len);
                     let value_copy: Vec<u8> = value.clone().map(|i| i.as_ref().to_owned()).flatten().collect();
-                    println!("[SMOLDOT host] ext_storage_get_version_1 -> {:x?}", value_copy);
+                    let value_hex = value_copy.iter().map(|i| format!("{:02x?}", i) ).collect::<String>();
+                    println!("[SMOLDOT host] ext_storage_get_version_1 -> {}", value_hex);
                     self.inner.alloc_write_and_return_pointer_size(
                         host_fn.name(),
                         iter::once(&[1][..])
