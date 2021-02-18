@@ -207,8 +207,6 @@ impl InterpreterPrototype {
             None
         };
 
-        println!("Module externals: {:?}", module.exports.borrow().iter().map(|(k, v)| k.clone()).collect::<Vec<_>>());
-
         Ok(InterpreterPrototype {
             module,
             memory,

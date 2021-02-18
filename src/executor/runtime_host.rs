@@ -508,6 +508,8 @@ impl Inner {
                 }
 
                 host::HostVm::ExternalStorageSet(req) => {
+                    println!("[SMOLDOT runtime_host] ExternalStorageSet: key: {:x?}, value: {:x?}",
+                    req.key(), req.value());
                     self.top_trie_root_calculation_cache
                         .as_mut()
                         .unwrap()
