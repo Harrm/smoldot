@@ -45,6 +45,7 @@ use crate::{
 use alloc::{string::String, vec::Vec};
 use core::{fmt, iter, slice};
 use hashbrown::{HashMap, HashSet};
+use crate::trie::calculate_root::RootMerkleValueCalculation;
 
 /// Configuration for [`run`].
 pub struct Config<'a, TParams> {
@@ -173,7 +174,7 @@ impl StorageGet {
                 either::Either::Left(iter::once(either::Either::Left(req.key())))
             }
 
-            host::HostVm::ExternalStorageRoot(_) => {
+            host::HostVm::ExternalStorageRoot(_) | host::HostVm::ExternalStorageSet(..) => {
                 if let calculate_root::RootMerkleValueCalculation::StorageValue(value_request) =
                 self.inner.root_calculation.as_ref().unwrap()
                 {
@@ -236,7 +237,7 @@ impl StorageGet {
                     .insert(req.key().to_vec(), Some(value));
                 self.inner.vm = req.resume();
             }
-            host::HostVm::ExternalStorageRoot(_) => {
+            host::HostVm::ExternalStorageRoot(_) | host::HostVm::ExternalStorageSet(..) => {
                 if let calculate_root::RootMerkleValueCalculation::StorageValue(value_request) =
                 self.inner.root_calculation.take().unwrap()
                 {
@@ -275,6 +276,7 @@ impl PrefixKeys {
         match &self.inner.vm {
             host::HostVm::ExternalStorageClearPrefix(req) => req.prefix(),
             host::HostVm::ExternalStorageRoot { .. } => &[],
+            host::HostVm::ExternalStorageSet { .. } => &[],
 
             // We only create a `PrefixKeys` if the state is one of the above.
             _ => unreachable!(),
@@ -316,7 +318,7 @@ impl PrefixKeys {
                 self.inner.vm = req.resume();
             }
 
-            host::HostVm::ExternalStorageRoot { .. } => {
+            host::HostVm::ExternalStorageRoot { .. } | host::HostVm::ExternalStorageSet(..) => {
                 if let calculate_root::RootMerkleValueCalculation::AllKeys(all_keys) =
                 self.inner.root_calculation.take().unwrap()
                 {
@@ -508,18 +510,55 @@ impl Inner {
                 }
 
                 host::HostVm::ExternalStorageSet(req) => {
-                    let key_hex = req.key().iter().map(|e| format!("{:02x}", e)).collect::<String>();
-                    let value_hex = req.value().map(|v| v.iter().map(|e| format!("{:02x}", e)).collect::<String>());
-                    println!("[SMOLDOT runtime_host] ExternalStorageSet: key: {}, value: {:?}",
-                             key_hex, value_hex);
+                    if self.root_calculation.is_none() {
+                        let key_hex = req.key().iter().map(|e| format!("{:02x}", e)).collect::<String>();
+                        let value_hex = req.value().map(|v| v.iter().map(|e| format!("{:02x}", e)).collect::<String>());
+                        println!("[SMOLDOT runtime_host] ExternalStorageSet: key: {}, value: {:?}",
+                                 key_hex, value_hex);
 
-                    self.top_trie_root_calculation_cache
-                        .as_mut()
-                        .unwrap()
-                        .storage_value_update(req.key(), req.value().is_some());
-                    self.top_trie_changes
-                        .insert(req.key().to_vec(), req.value().map(|v| v.to_vec()));
-                    self.vm = req.resume();
+                        self.top_trie_root_calculation_cache
+                            .as_mut()
+                            .unwrap()
+                            .storage_value_update(req.key(), req.value().is_some());
+                        self.top_trie_changes
+                            .insert(req.key().to_vec(), req.value().map(|v| v.to_vec()));
+
+                        self.root_calculation = Some(calculate_root::root_merkle_value(Some(
+                            self.top_trie_root_calculation_cache.take().unwrap(),
+                        )));
+                    }
+
+                    match self.root_calculation.take().unwrap() {
+                        calculate_root::RootMerkleValueCalculation::Finished { hash, cache } => {
+                            self.top_trie_root_calculation_cache = Some(cache);
+                            println!("[SMOLDOT runtime_host] ExternalStorageSet: new trie hash: {}",
+                                     hash.iter().map(|i| format!("{:02x?}", i) ).collect::<String>());
+                            self.vm = req.resume();
+                        }
+                        calculate_root::RootMerkleValueCalculation::AllKeys(keys) => {
+                            self.vm = req.into();
+                            self.root_calculation =
+                                Some(calculate_root::RootMerkleValueCalculation::AllKeys(keys));
+                            return RuntimeHostVm::PrefixKeys(PrefixKeys { inner: self });
+                        }
+                        calculate_root::RootMerkleValueCalculation::StorageValue(value_request) => {
+                            self.vm = req.into();
+                            // TODO: allocating a Vec, meh
+                            if let Some(overlay) = self
+                                .top_trie_changes
+                                .get(&value_request.key().collect::<Vec<_>>())
+                            {
+                                self.root_calculation =
+                                    Some(value_request.inject(overlay.as_ref()));
+                            } else {
+                                self.root_calculation =
+                                    Some(calculate_root::RootMerkleValueCalculation::StorageValue(
+                                        value_request,
+                                    ));
+                                return RuntimeHostVm::StorageGet(StorageGet { inner: self });
+                            }
+                        }
+                    }
                 }
 
                 host::HostVm::ExternalStorageAppend(req) => {
